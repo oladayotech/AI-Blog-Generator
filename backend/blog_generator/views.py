@@ -4,9 +4,14 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from django.conf import settings
 
-from pytube import Youtube
 import json
+import os
+
+import assemblyai as aai
+import openai
+from pytube import Youtube
 
 # Create your views here.
 
@@ -20,13 +25,18 @@ def genrate_blog(request):
         try:
             data = json.loads(request.body)
             yt_link = data['link']
-            return JsonResponse({'content':yt_link})
+            # title = yt_title(yt_link)
+            # return JsonResponse({'content':yt_link})
         except (KeyError):
             return JsonResponse({'error':'invalid data sent'}, status=400)
         
-        # Get video title 
+        # Get video title
+        title = yt_title(yt_link)
         
         # Get transcript
+        transcription = get_transcription(yt_link)
+        if not transcription:
+            return JsonResponse({'error': "Failed to get tranascript"}, status=500)
         
         # Use ai to generate blog
         
@@ -35,6 +45,32 @@ def genrate_blog(request):
         # return blog as a response
     else:
         return JsonResponse({'error':'invalid request method'}, status=405)
+    
+def yt_title(link):
+    yt = Youtube(link)
+    title = yt.title
+    return title
+
+def download_audio(link):
+    yt = Youtube(link)
+    video = yt.streams.filter(only_audio=True).first()
+    out_file = video.download(output_path=settings.MEDIA_ROOT)
+    base, ext = os.path.splitext(out_file)
+    new_file = base + '.mp3'
+    os.rename(out_file, new_file)
+    return new_file
+
+def get_transcription(link):
+    audio_file = download_audio(link)
+    aai.settings.api.key = "07bb447d0b2c403dabe29ebf335af6e3"
+    
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(audio_file)
+    
+    return transcriber.text
+
+def generate_blog_from_transcription(transcription):
+    pass
 
 def user_login(request):
     if request.method == 'POST':
