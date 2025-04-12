@@ -94,14 +94,29 @@ def yt_title(link):
         print(f"yt_dlp error: {e}")
         return 'Unknown Title'
 
+# def download_audio(link):
+#     yt = YouTube(link)
+#     video = yt.streams.filter(only_audio=True).first()
+#     out_file = video.download(output_path=settings.MEDIA_ROOT)
+#     base, ext = os.path.splitext(out_file)
+#     new_file = base + '.mp3'
+#     os.rename(out_file, new_file)
+#     return new_file
+
 def download_audio(link):
-    yt = YouTube(link)
-    video = yt.streams.filter(only_audio=True).first()
-    out_file = video.download(output_path=settings.MEDIA_ROOT)
-    base, ext = os.path.splitext(out_file)
-    new_file = base + '.mp3'
-    os.rename(out_file, new_file)
-    return new_file
+    try:
+        yt = YouTube(link)
+        video = yt.streams.filter(only_audio=True).first()
+        if video is None:
+            raise Exception("No audio stream found.")
+        out_file = video.download(output_path=settings.MEDIA_ROOT)
+        base, ext = os.path.splitext(out_file)
+        new_file = base + '.mp3'
+        os.rename(out_file, new_file)
+        return new_file
+    except Exception as e:
+        print(f"Error downloading audio: {e}")
+        raise
 
 def get_transcription(link):
     audio_file = download_audio(link)
