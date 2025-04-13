@@ -6,6 +6,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
 from urllib.parse import urlparse, parse_qs
+from .models import BlogPost
 
 import json
 import os
@@ -27,14 +28,14 @@ def generate_blog(request):
         try:
             data = json.loads(request.body)
             yt_link = data['link']
-            # print(yt_link)
             yt_link = clean_yt_url(yt_link)
+            if not yt_link:
+                return JsonResponse({"error": "YouTube link is missing."}, status=400)
             print(yt_link)
         except Exception as e:
             print("Error: {e}")
         except (KeyError, json.JSONDecodeError):
             return JsonResponse({'error': 'Invalid data sent'}, status=400)
-
 
         # get yt title
         title = yt_title(yt_link)
@@ -42,7 +43,7 @@ def generate_blog(request):
         # get transcript
         transcription = get_transcription(yt_link)
         if not transcription:
-            return JsonResponse({'error': " Failed to get transcript"}, status=500)
+            return JsonResponse({'error': "Failed to get transcript"}, status=500)
 
 
         # use OpenAI to generate the blog
@@ -51,13 +52,13 @@ def generate_blog(request):
             return JsonResponse({'error': " Failed to generate blog article"}, status=500)
 
         # # save blog article to database
-        # new_blog_article = BlogPost.objects.create(
-        #     user=request.user,
-        #     youtube_title=title,
-        #     youtube_link=yt_link,
-        #     generated_content=blog_content,
-        # )
-        # new_blog_article.save()
+        new_blog_article = BlogPost.objects.create(
+            user=request.user,
+            youtube_title=title,
+            youtube_link=yt_link,
+            generated_content=blog_content,
+        )
+        new_blog_article.save()
 
         # return blog article as a response
         return JsonResponse({'content': blog_content})
@@ -71,16 +72,6 @@ def clean_yt_url(url):
     if video_id:
         return f"https://www.youtube.com/watch?v={video_id[0]}"
     return None
-  
-# def yt_title(link):
-#     try:
-#         yt = YouTube(link)
-#         title = yt.title
-#         print(title)
-#         return title
-#     except Exception as e:
-#         print(f"yt_title error: {e}")
-#         return "unknown Title"
 
 def yt_title(link):
     try:
@@ -95,41 +86,71 @@ def yt_title(link):
         return 'Unknown Title'
 
 # def download_audio(link):
-#     yt = YouTube(link)
-#     video = yt.streams.filter(only_audio=True).first()
-#     out_file = video.download(output_path=settings.MEDIA_ROOT)
-#     base, ext = os.path.splitext(out_file)
-#     new_file = base + '.mp3'
-#     os.rename(out_file, new_file)
-#     return new_file
+    yt = YouTube(link)
+    video = yt.streams.filter(only_audio=True).first()
+    out_file = video.download(output_path=settings.MEDIA_ROOT)
+    base, ext = os.path.splitext(out_file)
+    new_file = base + '.mp3'
+    os.rename(out_file, new_file)
+    return new_file
 
-def download_audio(link):
+# Optional: Your whisper/audio transcriber import
+# from your_module import transcribe_audio_file
+
+def has_captions(yt):
+    """Checks if YouTube video has captions."""
+    return bool(yt.captions)
+
+def get_captions_transcript(yt):
+    """Extract English caption transcript if available."""
     try:
-        yt = YouTube(link)
-        video = yt.streams.filter(only_audio=True).first()
-        if video is None:
-            raise Exception("No audio stream found.")
-        out_file = video.download(output_path=settings.MEDIA_ROOT)
-        base, ext = os.path.splitext(out_file)
-        new_file = base + '.mp3'
-        os.rename(out_file, new_file)
-        return new_file
+        caption = yt.captions.get_by_language_code('en')
+        return caption.generate_srt_captions()
     except Exception as e:
-        print(f"Error downloading audio: {e}")
-        raise
+        print("Failed to get captions:", e)
+        return None
+
+def download_and_transcribe_audio(yt):
+    """Downloads audio and transcribes using your local transcriber."""
+    audio_stream = yt.streams.filter(only_audio=True).first()
+    out_file = audio_stream.download(filename="temp_audio.mp4")
+    
+    # Transcribe using your audio transcription function (e.g., Whisper)
+    aai.settings.api.key = ""
+        
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(out_file)
+    # transcript = transcribe_audio_file(out_file)
+    # transcript = "Simulated transcript..."  # Replace this line
+
+    # Clean up
+    if os.path.exists(out_file):
+        os.remove(out_file)
+    
+    return transcript.text
 
 def get_transcription(link):
-    audio_file = download_audio(link)
-    aai.settings.api.key = ""
+    """Main function to return transcript from captions or audio."""
+    yt = YouTube(link)
     
-    transcriber = aai.Transcriber()
-    transcript = transcriber.transcribe(audio_file)
+    if has_captions(yt):
+        print("Captions found. Using captions.")
+        return get_captions_transcript(yt)
+    else:
+        print("No captions found. Downloading audio and transcribing.")
+        return download_and_transcribe_audio(yt)
 
-    return transcript.text
+# def get_transcription(link):
+#     audio_file = download_audio(link)
+#     aai.settings.api.key = ""
+    
+#     transcriber = aai.Transcriber()
+#     transcript = transcriber.transcribe(audio_file)
+
+#     return transcript.text
 
 def generate_blog_from_transcription(transcription):
     openai.api_key = ""
-
     prompt = f"Based on the following transcript from a YouTube video, write a comprehensive blog article, write it based on the transcript, but dont make it look like a youtube video, make it look like a proper blog article:\n\n{transcription}\n\nArticle:"
 
     response = openai.Completion.create(
@@ -141,6 +162,9 @@ def generate_blog_from_transcription(transcription):
     generate_content = response.choices[0].text.strip()
     return generate_content
 
+def blog_list(request):
+    blog_articles = BlogPost.objects.filter(user=request.user)
+    return render(request,  'all_blogs.html', {'blog_articles':blog_articles})
 def user_login(request):
     if request.method == 'POST':
         username = request.POST['username']

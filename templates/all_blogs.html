@@ -27,14 +27,13 @@
             <section>
                 <h2 class="text-xl mb-4 font-semibold">All Blog Posts</h2>
                 <div class="space-y-4">
+                    
+                    {% for article in blog_articles %}
                     <div class="border border-gray-300 p-4 rounded">
                         <h3 class="text-lg font-semibold">Blog Post Title 1</h3>
                         <p>This is the conter of the blog post. Lorem ipsum dolor sit amet consectetur adipisicing elit. Exercitationem expedita ab voluptates fuga id eaque officiis.</p>
                     </div>
-                    <div class="border border-gray-300 p-4 rounded">
-                        <h3 class="text-lg font-semibold">Blog Post Title 2</h3>
-                        <p>This is the conter of the blog post. Lorem ipsum dolor sit amet consectetur adipisicing elit. Exercitationem expedita ab voluptates fuga id eaque officiis.</p>
-                    </div>
+                    {% endfor %}
                     <!-- Repeat -->
                 </div>
             </section>
