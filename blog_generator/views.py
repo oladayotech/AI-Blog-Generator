@@ -71,16 +71,6 @@ def clean_yt_url(url):
     if video_id:
         return f"https://www.youtube.com/watch?v={video_id[0]}"
     return None
-  
-# def yt_title(link):
-#     try:
-#         yt = YouTube(link)
-#         title = yt.title
-#         print(title)
-#         return title
-#     except Exception as e:
-#         print(f"yt_title error: {e}")
-#         return "unknown Title"
 
 def yt_title(link):
     try:

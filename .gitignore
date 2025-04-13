@@ -1,0 +1,37 @@
+
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+ENV/
+.venv/
+
+# Django
+*.sqlite3
+*.log
+db.sqlite3
+media/
+staticfiles/
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# dotenv / API keys
+.env
+
+# System files
+Thumbs.db
+
+# Migrations (optional if you auto-generate)
+*/migrations/*.pyc
+*/migrations/__pycache__/
+
